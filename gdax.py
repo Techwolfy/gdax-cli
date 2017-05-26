@@ -22,7 +22,7 @@ colors = {
 }
 
 # Global auth object
-auth = {}
+auth = None
 
 # JSON serializer for Decimal
 def decimal_default(obj):
@@ -84,7 +84,7 @@ def getTicker(silent=True):
 		print('Market price: {:.2f}'.format(Decimal(tick['price'])))
 	return tick
 
-# Poll the market ticker continuously
+# Watch the market ticker
 def watchTicker():
 	last = Decimal(0.0)
 	while(True):
@@ -107,7 +107,7 @@ def getAccounts(silent=True):
 	for account in accounts:
 		if(account['currency'] == 'BTC' or account['currency'] == 'USD'):
 			if(not silent):
-				print('{}: {}{:.8f}{}'.format(account['currency'], colors['magenta'], Decimal(account['balance']), colors['reset']))
+				print('{}: {:.8f}'.format(account['currency'], Decimal(account['balance'])))
 			out[account['currency']] = Decimal(account['balance'])
 	return out
 
@@ -164,8 +164,8 @@ def placeOrder(otype, side, size, price, silent=False):
 		'product_id': 'BTC-USD',
 		'type': otype,
 		'side': side,
-		'size': size,
-		'price': price,
+		'size': '{:.8f}'.format(Decimal(size)),
+		'price': '{:.8f}'.format(Decimal(price)),
 		'post_only': False if otype == 'market' else True
 	}
 
@@ -214,10 +214,15 @@ def cancelOrder(oid, silent=True):
 # Watch the status of an order
 def watchOrder(oid, silent=True):
 	order = getOrder(oid, silent)
-	while(order['status'] == 'open' or order['status'] == 'pending'):
+	while(order != None and (order['status'] == 'open' or order['status'] == 'pending')):
 		time.sleep(1)
 		order = getOrder(oid, silent)
 	return
+
+# Watch the data stream of the full order book
+def watchOrderBook():
+	book = api('products/BTC-USD/book?level=2')
+	#TODO: Display order book
 
 # Program entry point
 def main(argv):
@@ -249,7 +254,7 @@ def main(argv):
 	elif(argv[1] == 'live'):
 		watchTicker()
 	elif(argv[1] == 'orderbook'):
-		pass
+		watchOrderBook()
 	else:
 		help()
 	return
@@ -267,7 +272,7 @@ def help():
 	print("    limit buy/sell [BTC amount] [limit price]        Limit buy/sell BTC")
 	print("    stop buy/sell [BTC amount] [stop price]          Stop buy/sell BTC")
 	print("    live                                             Live stream of ticker data")
-	print(" ** orderbook                                        Live stream of order book data")
+	print("    orderbook                                        Live stream of order book data")
 	return
 
 #Shell entry point
