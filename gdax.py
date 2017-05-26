@@ -18,7 +18,8 @@ colors = {
 	'magenta':	"\x1b[35m",
 	'cyan':		"\x1b[36m",
 	'white':	"\x1b[37m",
-	'reset':	"\x1b[0m"
+	'reset':	"\x1b[0m",
+	'clear':	"\x1b[2J"
 }
 
 # Global auth object
@@ -98,6 +99,54 @@ def watchTicker():
 			print('Market price: {:.2f}'.format(tick))
 
 		last = tick
+	return
+
+# Get the full order book
+def getOrderBook(silent=True, clear=False):
+	book = api('products/BTC-USD/book?level=2')
+	if(silent):
+		return book
+
+	if(clear):
+		print(colors['clear'])
+
+	spreadstr = 'Spread: {}${:.2f}{}'.format(
+		colors['yellow'],
+		Decimal(book['asks'][0][0]) - Decimal(book['bids'][0][0]),
+		colors['reset']
+	)
+	mmpstr = 'Mid-Market Price: {}${:.2f}{}'.format(
+		colors['yellow'],
+		(Decimal(book['asks'][0][0]) + Decimal(book['bids'][0][0])) / 2,
+		colors['reset']
+	)
+	padding = 40 - len(spreadstr)
+	print(spreadstr + (' ' * padding) + mmpstr)
+	print('')
+
+	print((' ' * 8) + 'Bid' + (' ' * 28) + 'Ask')
+	for i in range(0, 25):
+		bidstr = '{}${:.2f}{}: {:.8f}'.format(
+			colors['green'],
+			Decimal(book['bids'][i][0]),
+			colors['reset'],
+			Decimal(book['bids'][i][1])
+		)
+		askstr = '{}${:.2f}{}: {:.8f}'.format(
+			colors['red'],
+			Decimal(book['asks'][i][0]),
+			colors['reset'],
+			Decimal(book['asks'][i][1])
+		)
+		padding = 40 - len(bidstr)
+		print(bidstr + (' ' * padding) + askstr)
+	return book
+
+# Watch live order book updates
+def watchOrderBook():
+	while(True):
+		getOrderBook(silent=False, clear=True)
+		time.sleep(1)
 	return
 
 # Get account balances
@@ -219,11 +268,6 @@ def watchOrder(oid, silent=True):
 		order = getOrder(oid, silent)
 	return
 
-# Watch the data stream of the full order book
-def watchOrderBook():
-	book = api('products/BTC-USD/book?level=2')
-	#TODO: Display order book
-
 # Program entry point
 def main(argv):
 	global auth
@@ -237,6 +281,8 @@ def main(argv):
 		help()
 	elif(argv[1] == 'ticker'):
 		getTicker(silent=False)
+	elif(argv[1] == 'orderbook'):
+		getOrderBook(silent=False)
 	elif(argv[1] == 'balance'):
 		getAccounts(silent=False)
 	elif(argv[1] == 'orders'):
@@ -252,9 +298,9 @@ def main(argv):
 	elif(argv[1] == 'cancel' and len(argv) == 3):
 		cancelOrder(argv[2], silent=False)
 	elif(argv[1] == 'live'):
-		watchTicker()
-	elif(argv[1] == 'orderbook'):
 		watchOrderBook()
+	elif(argv[1] == 'liveticker'):
+		watchTicker()
 	else:
 		help()
 	return
@@ -263,6 +309,7 @@ def main(argv):
 def help():
 	print("Usage: gdax <command> [arguments]")
 	print("    ticker                                           Get current market ticker")
+	print("    orderbook                                        Get current order book data")
 	print("    balance                                          Get current account balance")
 	print("    orders                                           Get list of existing orders")
 	print("    order [order ID]                                 Get details of existing order")
@@ -271,8 +318,8 @@ def help():
 	print("    market buy/sell [BTC amount]                     Alias for buy/sell")
 	print("    limit buy/sell [BTC amount] [limit price]        Limit buy/sell BTC")
 	print("    stop buy/sell [BTC amount] [stop price]          Stop buy/sell BTC")
-	print("    live                                             Live stream of ticker data")
-	print("    orderbook                                        Live stream of order book data")
+	print("    live                                             Live stream of order book data")
+	print("    liveticker                                       Live stream of ticker data")
 	return
 
 #Shell entry point
