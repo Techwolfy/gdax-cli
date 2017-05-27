@@ -124,22 +124,37 @@ def getOrderBook(silent=True, clear=False):
 	print(spreadstr + (' ' * padding) + mmpstr)
 	print('')
 
+	bidtotal = Decimal(0.0)
+	asktotal = Decimal(0.0)
+	for i in range (0, 24):
+		bidtotal += Decimal(book['bids'][i][1])
+		asktotal += Decimal(book['asks'][i][1])
+
 	print((' ' * 8) + 'Bid' + (' ' * 28) + 'Ask')
-	for i in range(0, 25):
-		bidstr = '{}${:.2f}{}: {:.8f}'.format(
+	for i in range(0, 24):
+		bidstr = '{}${:.2f}{}: {:.8f} {}'.format(
 			colors['green'],
 			Decimal(book['bids'][i][0]),
 			colors['reset'],
-			Decimal(book['bids'][i][1])
+			Decimal(book['bids'][i][1]),
+			'\u2588' * min(int(32 * Decimal(book['bids'][i][1]) / bidtotal), 8)
 		)
-		askstr = '{}${:.2f}{}: {:.8f}'.format(
+		askstr = '{}${:.2f}{}: {:.8f} {}'.format(
 			colors['red'],
 			Decimal(book['asks'][i][0]),
 			colors['reset'],
-			Decimal(book['asks'][i][1])
+			Decimal(book['asks'][i][1]),
+			'\u2588' * min(int(32 * Decimal(book['asks'][i][1]) / asktotal), 8)
 		)
 		padding = 40 - len(bidstr)
 		print(bidstr + (' ' * padding) + askstr)
+
+	bidtotalstr = 'Total:    {:.8f}'.format(bidtotal)
+	asktotalstr = 'Total:    {:.8f}'.format(asktotal)
+	padding = 27 - len(bidtotalstr)
+	dirstr = '>>>>' if bidtotal > asktotal else '<<<<'
+	print(bidtotalstr + (' ' * int(padding/2)) + dirstr + (' ' * int(padding - padding/2)) + asktotalstr)
+
 	return book
 
 # Watch live order book updates
@@ -164,8 +179,9 @@ def getAccounts(silent=True):
 def getOrderList(silent=True):
 	orders = api('orders?status=open')
 	if(not silent):
-		for order in orders:
-			print('{} ({}): {} {} {:.8f}BTC at ${:.2f}'.format(
+		for i, order in enumerate(orders):
+			print('{}: {} ({}): {} {} {:.8f}BTC at ${:.2f}'.format(
+				i,
 				order['id'],
 				order['status'],
 				order['type'],
@@ -184,20 +200,20 @@ def getOrder(oid, silent=True):
 		return None
 
 	#Order completed
-	if(order['status'] == 'done' or order['status'] == 'settled'):
+	if(not silent and (order['status'] == 'done' or order['status'] == 'settled')):
 		verb = 'Sold' if order['side'] == 'sell' else 'Bought'
 		print(verb + '{:.8f} BTC at ${:.2f}'.format(Decimal(order['filled_size']), order['funds']))
 
 	#Order not placed
-	elif(order['status'] == 'rejected'):
+	elif(not silent and order['status'] == 'rejected'):
 		print('Order was rejected')
 
 	#Error with order
-	elif(order['status'] != 'open' and order['status'] != 'pending'):
+	elif(not silent and order['status'] != 'open' and order['status'] != 'pending'):
 		print('Error processing order (status: ' + order['status'] + ')')
 
 	#Order pending
-	else:
+	elif(not silent):
 		print('{} {} {:.8f}BTC at ${:.2f} (pending)'.format(
 				order['type'],
 				order['side'],
@@ -249,11 +265,12 @@ def cancelOrder(oid, silent=True):
 
 	result = api('orders/' + oid, delete=True, notFoundOK=True)
 	if(not silent):
-		if(result == {}):
-			print('Cancelled {} order for {:.8f} BTC at ${:.2f}/coin'.format(
-				order['type'] + order['side'],
-				order['size'],
-				order['price']
+		if(result == {} or result[0] == oid):
+			print('Cancelled {} {} order for {:.8f} BTC at ${:.2f}/coin'.format(
+				order['type'],
+				order['side'],
+				Decimal(order['size']),
+				Decimal(order['price'])
 			))
 		else:
 			print('Failed to cancel order!')
@@ -275,6 +292,10 @@ def main(argv):
 	authdata = json.load(authfile)
 	authfile.close()
 	auth = GDAXAuth(authdata['API_KEY'], authdata['API_SECRET'], authdata['API_PASS'])
+
+	if(len(argv) == 3 and len(argv[2]) <= 2):
+		oid = getOrderList()[int(argv[2])]['id']
+		argv[2] = oid
 
 	# Main program loop
 	if(len(argv) < 2):
