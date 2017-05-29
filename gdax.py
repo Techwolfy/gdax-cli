@@ -129,6 +129,7 @@ def getOrderBook(silent=True, clear=False):
 	for i in range (0, 24):
 		bidtotal += Decimal(book['bids'][i][1])
 		asktotal += Decimal(book['asks'][i][1])
+	total = bidtotal + asktotal
 
 	print((' ' * 8) + 'Bid' + (' ' * 28) + 'Ask')
 	for i in range(0, 24):
@@ -137,14 +138,14 @@ def getOrderBook(silent=True, clear=False):
 			Decimal(book['bids'][i][0]),
 			colors['reset'],
 			Decimal(book['bids'][i][1]),
-			'\u2588' * min(int(32 * Decimal(book['bids'][i][1]) / bidtotal), 8)
+			'\u2588' * min(int(64 * Decimal(book['bids'][i][1]) / total), 8)
 		)
 		askstr = '{}${:.2f}{}: {:.8f} {}'.format(
 			colors['red'],
 			Decimal(book['asks'][i][0]),
 			colors['reset'],
 			Decimal(book['asks'][i][1]),
-			'\u2588' * min(int(32 * Decimal(book['asks'][i][1]) / asktotal), 8)
+			'\u2588' * min(int(64 * Decimal(book['asks'][i][1]) / total), 8)
 		)
 		padding = 40 - len(bidstr)
 		print(bidstr + (' ' * padding) + askstr)
@@ -225,22 +226,37 @@ def getOrder(oid, silent=True):
 
 # Place an order
 def placeOrder(otype, side, size, price, silent=False):
-	order = {
-		'product_id': 'BTC-USD',
-		'type': otype,
-		'side': side,
-		'size': '{:.8f}'.format(Decimal(size)),
-		'price': '{:.8f}'.format(Decimal(price)),
-		'post_only': False if otype == 'market' else True
-	}
+	if(otype == 'market'):
+		order = {
+			'product_id': 'BTC-USD',
+			'type': otype,
+			'side': side,
+			'size': '{:.8f}'.format(Decimal(size)),
+		}
 
-	if(not silent):
-		action = input('Place {} {} order for {:.8f} BTC at ${:.2f}/coin (y/N)? '.format(
-			order['type'],
-			order['side'],
-			Decimal(order['size']),
-			Decimal(order['price'])
-		))
+		if(not silent):
+			action = input('Place {} {} order for {:.8f} BTC at $MKT (y/N)? '.format(
+				order['type'],
+				order['side'],
+				Decimal(order['size']),
+			))
+	else:
+		order = {
+			'product_id': 'BTC-USD',
+			'type': otype,
+			'side': side,
+			'size': '{:.8f}'.format(Decimal(size)),
+			'price': '{:.8f}'.format(Decimal(price)),
+			'post_only': True
+		}
+
+		if(not silent):
+			action = input('Place {} {} order for {:.8f} BTC at ${:.2f}/coin (y/N)? '.format(
+				order['type'],
+				order['side'],
+				Decimal(order['size']),
+				Decimal(order['price'])
+			))
 
 	if(action.lower() == 'y' or silent):
 		result = api('orders', order)
@@ -293,7 +309,7 @@ def main(argv):
 	authfile.close()
 	auth = GDAXAuth(authdata['API_KEY'], authdata['API_SECRET'], authdata['API_PASS'])
 
-	if(len(argv) == 3 and len(argv[2]) <= 2):
+	if(len(argv) == 3 and len(argv[2]) == 1):
 		oid = getOrderList()[int(argv[2])]['id']
 		argv[2] = oid
 
@@ -314,7 +330,9 @@ def main(argv):
 		watchOrder(argv[2], silent=False)
 	elif(argv[1] == 'buy' or argv[1] == 'sell' and len(argv) == 4):
 		placeOrder('market', argv[1], argv[2], argv[3], silent=False)
-	elif((argv[1] == 'market' or argv[1] == 'limit' or argv[1] == 'stop') and len(argv) == 5):
+	elif(argv[1] == 'market' and len(argv) == 4):
+		placeOrder('market', argv[2], argv[3], None, silent=False)
+	elif((argv[1] == 'limit' or argv[1] == 'stop') and len(argv) == 5):
 		placeOrder(argv[1], argv[2], argv[3], argv[4], silent=False)
 	elif(argv[1] == 'cancel' and len(argv) == 3):
 		cancelOrder(argv[2], silent=False)
