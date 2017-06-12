@@ -304,7 +304,7 @@ def watchOrder(oid, silent=True):
 # Program entry point
 def main(argv):
 	global auth
-	authfile = open('auth.json', 'r')
+	authfile = open(sys.path[0] + '/auth.json', 'r')
 	authdata = json.load(authfile)
 	authfile.close()
 	auth = GDAXAuth(authdata['API_KEY'], authdata['API_SECRET'], authdata['API_PASS'])
